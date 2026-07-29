@@ -2,3 +2,5 @@ frontend/node_modules/
 frontend/dist/
 backend/target/
 .env
+backend/.metadata/
+backend/backend/.git
