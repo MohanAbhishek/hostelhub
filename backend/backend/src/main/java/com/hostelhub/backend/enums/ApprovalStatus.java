@@ -1,0 +1,7 @@
+package com.hostelhub.backend.enums;
+
+public enum ApprovalStatus {
+    PENDING,
+    APPROVED,
+    REJECTED
+}
