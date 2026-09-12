@@ -1,6 +1,7 @@
 package com.hostelhub.backend.security;
 
 import java.util.List;
+
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
@@ -56,12 +57,20 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(
                 List.of(
                         "http://localhost:5173",
-                        "http://localhost:5174"
+                        "http://localhost:5174",
+                        "https://hostelhub-f.onrender.com"
                 )
         );
 
         configuration.setAllowedMethods(
-                List.of("*")
+                List.of(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "PATCH",
+                        "OPTIONS"
+                )
         );
 
         configuration.setAllowedHeaders(
@@ -92,26 +101,32 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
 
                 .exceptionHandling(exception ->
-                exception
-                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                        exception
+                                .authenticationEntryPoint(
+                                        jwtAuthenticationEntryPoint
+                                )
 
-                        .accessDeniedHandler(
-                                (request, response, accessDeniedException) -> {
+                                .accessDeniedHandler(
+                                        (request, response, accessDeniedException) -> {
 
-                                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                                            response.setStatus(
+                                                    HttpServletResponse.SC_FORBIDDEN
+                                            );
 
-                                    response.setContentType("application/json");
+                                            response.setContentType(
+                                                    "application/json"
+                                            );
 
-                                    response.getWriter().write("""
-                                        {
-                                          "success": false,
-                                          "message": "Access Denied",
-                                          "status": 403
+                                            response.getWriter().write("""
+                                                {
+                                                  "success": false,
+                                                  "message": "Access Denied",
+                                                  "status": 403
+                                                }
+                                            """);
                                         }
-                                    """);
-                                }
-                        )
-        )
+                                )
+                )
 
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
@@ -121,22 +136,31 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth ->
                         auth
+                                .requestMatchers(
+                                        org.springframework.http.HttpMethod.OPTIONS,
+                                        "/**"
+                                )
+                                .permitAll()
 
                                 .requestMatchers(
                                         "/api/auth/**"
-                                ).permitAll()
+                                )
+                                .permitAll()
 
                                 .requestMatchers(
                                         "/api/student/**"
-                                ).hasRole("STUDENT")
+                                )
+                                .hasRole("STUDENT")
 
                                 .requestMatchers(
                                         "/api/landlord/**"
-                                ).hasRole("LANDLORD")
+                                )
+                                .hasRole("LANDLORD")
 
                                 .requestMatchers(
                                         "/api/admin/**"
-                                ).hasRole("ADMIN")
+                                )
+                                .hasRole("ADMIN")
 
                                 .anyRequest()
                                 .authenticated()
