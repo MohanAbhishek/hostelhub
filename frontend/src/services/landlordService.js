@@ -3,7 +3,7 @@
 import axios from "axios";
 
 const API =
-  "http://localhost:8081/api/hostels";
+  `${import.meta.env.VITE_API_URL}/hostels`
 
 const getHeaders = () => {
 

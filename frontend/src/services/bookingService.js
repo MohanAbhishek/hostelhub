@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API =
-  "http://localhost:8081/api/bookings";
+  `${import.meta.env.VITE_API_URL}/bookings`;
 
 export const createBooking = async (
   roomId,
