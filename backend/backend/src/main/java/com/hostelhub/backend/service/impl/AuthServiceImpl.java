@@ -1,8 +1,6 @@
 package com.hostelhub.backend.service.impl;
 
-import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Value;
 
@@ -20,7 +18,6 @@ import com.hostelhub.backend.dto.auth.LoginRequest;
 import com.hostelhub.backend.dto.auth.RegisterRequest;
 import com.hostelhub.backend.dto.auth.UserResponse;
 
-import com.hostelhub.backend.entity.OtpVerification;
 import com.hostelhub.backend.entity.User;
 
 import com.hostelhub.backend.enums.AccountStatus;
@@ -30,13 +27,11 @@ import com.hostelhub.backend.exception.ResourceNotFoundException;
 
 import com.hostelhub.backend.mapper.UserMapper;
 
-import com.hostelhub.backend.repository.OtpVerificationRepository;
 import com.hostelhub.backend.repository.UserRepository;
 
 import com.hostelhub.backend.security.JwtService;
 
 import com.hostelhub.backend.service.AuthService;
-import com.hostelhub.backend.service.EmailService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -53,20 +48,22 @@ public class AuthServiceImpl
 
     private final AuthenticationManager authenticationManager;
 
-    private final OtpVerificationRepository otpRepository;
-
-    private final EmailService emailService;
-
     private final WebClient.Builder webClientBuilder;
 
     @Value("${recaptcha.secret}")
     private String recaptchaSecret;
+
+
+    // =========================================================
+    // REGISTER
+    // =========================================================
 
     @Override
     public AuthResponse register(
             RegisterRequest request
     ) {
 
+        // CHECK EMAIL
         if (
                 userRepository.existsByEmail(
                         request.getEmail()
@@ -78,6 +75,8 @@ public class AuthServiceImpl
             );
         }
 
+
+        // CHECK PHONE NUMBER
         if (
                 userRepository.existsByPhoneNumber(
                         request.getPhoneNumber()
@@ -89,6 +88,8 @@ public class AuthServiceImpl
             );
         }
 
+
+        // CREATE USER
         User user = User.builder()
 
                 .fullName(
@@ -125,62 +126,33 @@ public class AuthServiceImpl
                         AccountStatus.ACTIVE
                 )
 
-                .emailVerified(false)
+                // EMAIL VERIFICATION
+                // NO EMAIL OTP REQUIRED
+                .emailVerified(true)
 
                 .build();
 
+
+        // SAVE USER
         User savedUser =
                 userRepository.save(user);
 
-        // GENERATE OTP
 
-        String otp =
-                String.valueOf(
-                        100000 +
-                        new Random().nextInt(900000)
-                );
-
-        // SAVE OTP
-
-        OtpVerification otpVerification =
-                OtpVerification.builder()
-
-                        .email(
-                                savedUser.getEmail()
-                        )
-
-                        .otp(otp)
-
-                        .expiryTime(
-                                LocalDateTime.now()
-                                        .plusMinutes(5)
-                        )
-
-                        .verified(false)
-
-                        .build();
-
-        otpRepository.save(
-                otpVerification
-        );
-
-        // SEND OTP EMAIL
-
-        emailService.sendOtpEmail(
-                savedUser.getEmail(),
-                otp
-        );
-
+        // GENERATE JWT TOKEN
         String token =
                 jwtService.generateToken(
                         savedUser
                 );
 
+
+        // CONVERT USER TO RESPONSE
         UserResponse userResponse =
                 UserMapper.toUserResponse(
                         savedUser
                 );
 
+
+        // RETURN RESPONSE
         return AuthResponse.builder()
 
                 .token(token)
@@ -192,7 +164,10 @@ public class AuthServiceImpl
                 .build();
     }
 
+
+    // =========================================================
     // CAPTCHA VALIDATION
+    // =========================================================
 
     private boolean verifyCaptcha(
             String captchaToken
@@ -212,7 +187,9 @@ public class AuthServiceImpl
 
                                         .host("www.google.com")
 
-                                        .path("/recaptcha/api/siteverify")
+                                        .path(
+                                                "/recaptcha/api/siteverify"
+                                        )
 
                                         .queryParam(
                                                 "secret",
@@ -233,26 +210,34 @@ public class AuthServiceImpl
 
                         .block();
 
+
         System.out.println(
                 "CAPTCHA RESPONSE: " +
                 response
         );
 
+
         return Boolean.TRUE.equals(
                 response.get("success")
         );
     }
+
+
+    // =========================================================
+    // LOGIN
+    // =========================================================
+
     @Override
     public AuthResponse login(
             LoginRequest request
     ) {
 
         // CAPTCHA CHECK
-
         boolean captchaValid =
                 verifyCaptcha(
                         request.getCaptchaToken()
                 );
+
 
         if (!captchaValid) {
 
@@ -261,6 +246,8 @@ public class AuthServiceImpl
             );
         }
 
+
+        // AUTHENTICATE USER
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getEmail(),
@@ -268,6 +255,8 @@ public class AuthServiceImpl
                 )
         );
 
+
+        // FIND USER
         User user =
                 userRepository.findByEmail(
                         request.getEmail()
@@ -279,25 +268,38 @@ public class AuthServiceImpl
                         )
                 );
 
-        // EMAIL VERIFICATION CHECK
 
-        if (!user.isEmailVerified()) {
+        // =====================================================
+        // EMAIL VERIFICATION CHECK REMOVED
+        // =====================================================
+        //
+        // User can now login immediately after registration.
+        //
+        // No:
+        //
+        // if (!user.isEmailVerified()) {
+        //     throw new RuntimeException(
+        //             "Please verify your email first"
+        //     );
+        // }
+        //
 
-            throw new RuntimeException(
-                    "Please verify your email first"
-            );
-        }
 
+        // GENERATE JWT
         String token =
                 jwtService.generateToken(
                         user
                 );
 
+
+        // USER RESPONSE
         UserResponse userResponse =
                 UserMapper.toUserResponse(
                         user
                 );
 
+
+        // RETURN LOGIN RESPONSE
         return AuthResponse.builder()
 
                 .token(token)
@@ -309,180 +311,16 @@ public class AuthServiceImpl
                 .build();
     }
 
-    @Override
-    public void verifyOtp(
-            String email,
-            String otp
-    ) {
 
-        OtpVerification otpData =
-                otpRepository
-                        .findTopByEmailOrderByIdDesc(
-                                email
-                        )
-                        .orElseThrow(() ->
-
-                                new RuntimeException(
-                                        "OTP not found"
-                                )
-                        );
-
-        // INVALID OTP
-
-        if (
-                !otpData.getOtp().equals(otp)
-        ) {
-
-            throw new RuntimeException(
-                    "Invalid OTP"
-            );
-        }
-
-        // EXPIRED OTP
-
-        if (
-                otpData.getExpiryTime()
-                        .isBefore(
-                                LocalDateTime.now()
-                        )
-        ) {
-
-            throw new RuntimeException(
-                    "OTP expired"
-            );
-        }
-
-        User user =
-                userRepository.findByEmail(email)
-                        .orElseThrow(() ->
-
-                                new RuntimeException(
-                                        "User not found"
-                                )
-                        );
-
-        user.setEmailVerified(true);
-
-        userRepository.save(user);
-        
-        emailService.sendVerificationSuccessEmail(
-                user.getEmail()
-        );
-
-        otpData.setVerified(true);
-
-        otpRepository.save(otpData);
-    }
-
-    @Override
-    public void sendForgotPasswordOtp(
-            String email
-    ) {
-
-        User user =
-                userRepository.findByEmail(email)
-                        .orElseThrow(() ->
-
-                                new ResourceNotFoundException(
-                                        "User not found"
-                                )
-                        );
-
-        String otp =
-                String.valueOf(
-                        100000 +
-                        new Random().nextInt(900000)
-                );
-
-        OtpVerification otpVerification =
-                OtpVerification.builder()
-
-                        .email(email)
-
-                        .otp(otp)
-
-                        .verified(false)
-
-                        .expiryTime(
-                                LocalDateTime.now()
-                                        .plusMinutes(5)
-                        )
-
-                        .build();
-
-        otpRepository.save(
-                otpVerification
-        );
-
-        emailService.sendOtpEmail(
-                user.getEmail(),
-                otp
-        );
-    }
-
-    @Override
-    public void resetPassword(
-            String email,
-            String otp,
-            String newPassword
-    ) {
-
-        OtpVerification otpData =
-                otpRepository
-                        .findTopByEmailOrderByIdDesc(
-                                email
-                        )
-                        .orElseThrow(() ->
-
-                                new RuntimeException(
-                                        "OTP not found"
-                                )
-                        );
-
-        // INVALID OTP
-
-        if (
-                !otpData.getOtp().equals(otp)
-        ) {
-
-            throw new RuntimeException(
-                    "Invalid OTP"
-            );
-        }
-
-        // EXPIRED OTP
-
-        if (
-                otpData.getExpiryTime()
-                        .isBefore(
-                                LocalDateTime.now()
-                        )
-        ) {
-
-            throw new RuntimeException(
-                    "OTP expired"
-            );
-        }
-
-        User user =
-                userRepository.findByEmail(email)
-                        .orElseThrow(() ->
-
-                                new RuntimeException(
-                                        "User not found"
-                                )
-                        );
-
-        user.setPassword(
-                passwordEncoder.encode(
-                        newPassword
-                )
-        );
-
-        userRepository.save(user);
-
-        otpData.setVerified(true);
-
-        otpRepository.save(otpData);
-    }
+    // =========================================================
+    // OLD EMAIL OTP METHODS
+    // =========================================================
+    //
+    // These methods are temporarily kept out of this class.
+    //
+    // We will clean the AuthService interface,
+    // AuthController, OTP entity/repository,
+    // and frontend OTP pages in the next steps.
+    //
+    // =========================================================
 }

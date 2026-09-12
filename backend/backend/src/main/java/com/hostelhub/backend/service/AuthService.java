@@ -9,18 +9,4 @@ public interface AuthService {
     AuthResponse register(RegisterRequest request);
 
     AuthResponse login(LoginRequest request);
-    
-    void verifyOtp(
-            String email,
-            String otp
-    );
-    void sendForgotPasswordOtp(
-            String email
-    );
-
-    void resetPassword(
-            String email,
-            String otp,
-            String newPassword
-    );
 }

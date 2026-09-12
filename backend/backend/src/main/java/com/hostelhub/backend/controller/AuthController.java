@@ -1,13 +1,9 @@
 package com.hostelhub.backend.controller;
 
 import com.hostelhub.backend.dto.auth.AuthResponse;
-
 import com.hostelhub.backend.dto.auth.LoginRequest;
 import com.hostelhub.backend.dto.auth.RegisterRequest;
-import com.hostelhub.backend.dto.auth.VerifyOtpRequest;
 import com.hostelhub.backend.service.AuthService;
-import com.hostelhub.backend.dto.auth.ForgotPasswordRequest;
-import com.hostelhub.backend.dto.auth.ResetPasswordRequest;
 
 import jakarta.validation.Valid;
 
@@ -46,49 +42,5 @@ public class AuthController {
                 authService.login(request);
 
         return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/verify-otp")
-    public ResponseEntity<String> verifyOtp(
-            @RequestBody VerifyOtpRequest request
-    ) {
-
-        authService.verifyOtp(
-                request.getEmail(),
-                request.getOtp()
-        );
-
-        return ResponseEntity.ok(
-                "Email verified successfully"
-        );
-    }
-    @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgotPassword(
-            @RequestBody ForgotPasswordRequest request
-    ) {
-
-        authService.sendForgotPasswordOtp(
-                request.getEmail()
-        );
-
-        return ResponseEntity.ok(
-                "OTP sent successfully"
-        );
-    }
-
-    @PostMapping("/reset-password")
-    public ResponseEntity<String> resetPassword(
-            @RequestBody ResetPasswordRequest request
-    ) {
-
-        authService.resetPassword(
-                request.getEmail(),
-                request.getOtp(),
-                request.getNewPassword()
-        );
-
-        return ResponseEntity.ok(
-                "Password reset successful"
-        );
     }
 }
